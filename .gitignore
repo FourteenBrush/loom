@@ -1,0 +1,9 @@
+# build artifacts
+/*.exe
+/*.pdb
+/*.o
+# TODO: add output name here
+# LLVM IR
+/*.ll
+# Taskfile checksums
+.task
