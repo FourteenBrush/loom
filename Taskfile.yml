@@ -2,11 +2,11 @@ version: "3"
 silent: true
 
 vars:
-  OUT_NAME: "TODO"
+  OUT_NAME: "grumm"
   COLLECTIONS: >-
   CHECK_FLAGS: "{{.COLLECTIONS}} -strict-style"
   FLAGS: "-out:{{.OUT_NAME}} {{.CHECK_FLAGS}}"
-  DEBUG_FLAGS: "-debug" # -use-separate-modules" TODO: is broken for now
+  DEBUG_FLAGS: "-debug -use-separate-modules"
 
 tasks:
   default:
