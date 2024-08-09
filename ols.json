@@ -1,5 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/ols.schema.json",
+    "character_width": 100,
     "enable_document_symbols": true,
     "enable_semantic_tokens": true,
     "enable_hover": true,

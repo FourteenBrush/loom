@@ -5,6 +5,7 @@
 grumm
 # do not ignore build system
 !grumm/
+out/
 # LLVM IR
 /*.ll
 # Taskfile checksums
