@@ -10,18 +10,18 @@ import "core:path/filepath"
 // TODO: allow optional dependencies?
 // TODO: define ways how to build a dependency? (in case of compiled code)
 Dependency :: struct {
-	name:    string,
-	variant: DependencyVariant,
+    name:    string,
+    variant: DependencyVariant,
 }
 
 DependencyVariant :: union {
-	CodeSource,
-	GitSubmodule,
+    CodeSource,
+    GitSubmodule,
 }
 
 @(private)
 CodeSource :: struct {
-	using opts: CodeSourceOptions,
+    using opts: CodeSourceOptions,
 }
 
 duck := Dependency {
@@ -40,16 +40,16 @@ CodeSourceOptions :: struct {
 
 @(private)
 GitSubmodule :: struct {
-	url:        string,
-	using opts: GitSubmoduleOptions,
+    url:        string,
+    using opts: GitSubmoduleOptions,
 }
 
 GitSubmoduleOptions :: struct {
-	branch:                string,
-	tag:                   string,
-	commit:                string,
+    branch:                string,
+    tag:                   string,
+    commit:                string,
     // don't recursively fetch submodules
-	ignore_submodules:     bool,
+    ignore_submodules:     bool,
     // the path where a Git submodule is supposed to be placed, this must only be specified when this is
     // different from the default path ($Build.install_dir/$dependency_name). Path starts from the project root.
     install_path: string,
@@ -58,8 +58,8 @@ GitSubmoduleOptions :: struct {
 // a processed dependency
 @(private)
 Collection :: struct {
-	name: string,
-	path: string,
+    name: string,
+    path: string,
 }
 
 // odinfmt: disable
@@ -86,12 +86,12 @@ add_git_submodule :: proc(name: string, url: string, opts := GitSubmoduleOptions
 
 @(private)
 verify_dependencies :: proc(install_path: string, allocator := context.allocator) -> ErrorMsg {
-	for name, dependency in g_build_info.dependencies {
-		err := verify_dependency(name, dependency, install_path, allocator)
-		if err != "" do return err
-	}
+    for name, dependency in g_build_info.dependencies {
+        err := verify_dependency(name, dependency, install_path, allocator)
+        if err != "" do return err
+    }
 
-	return ""
+    return ""
 }
 
 // odinfmt: disable
@@ -167,35 +167,35 @@ illegal_name_chars := get_illegal_name_chars()
 
 @(private)
 get_illegal_name_chars := proc() -> strings.Ascii_Set {
-	set, ok := strings.ascii_set_make(illegal_name_chars_str)
-	assert(ok, "sanity check")
-	return set
+    set, ok := strings.ascii_set_make(illegal_name_chars_str)
+    assert(ok, "sanity check")
+    return set
 }
 
 @(private)
 is_valid_dependency_name :: proc(name: string) -> bool {
-	for _, i in name {
-		if strings.ascii_set_contains(illegal_name_chars, name[i]) {
-			return false
-		}
-	}
-	return true
+    for _, i in name {
+        if strings.ascii_set_contains(illegal_name_chars, name[i]) {
+            return false
+        }
+    }
+    return true
 }
 
 @(private)
 is_dependency_present :: proc(install_path, name: string) -> bool {
-	return os.exists(filepath.join({install_path, name}, context.temp_allocator))
+    return os.exists(filepath.join({install_path, name}, context.temp_allocator))
 }
 
 @(private)
 install_missing_dependencies :: proc(install_path: string) -> (err: string) {
-	// only consider Git submodules, as code source dirs are verified to exist
-	for name, dep in g_build_info.dependencies {
-		variant := dep.variant.(GitSubmodule) or_continue
+    // only consider Git submodules, as code source dirs are verified to exist
+    for name, dep in g_build_info.dependencies {
+        variant := dep.variant.(GitSubmodule) or_continue
         if !is_dependency_present(install_path, name) {
 
         }
-	}
+    }
     return
 }
 
