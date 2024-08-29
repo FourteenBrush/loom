@@ -2,31 +2,41 @@ package grumm
 
 import "core:os"
 import "core:fmt"
+import "core:log"
 import "core:c/libc"
 import "core:strings"
 import "core:path/filepath"
 
-E_VERIFICATION_FAILED    :: 1
-E_ODIN_INVOCATION_FAILED :: 2
+VERIFICATION_FAILED    :: 1
+ODIN_INVOCATION_FAILED :: 2
+DEFAULT_INSTALL_DIR      :: "dependencies"
+
+// TODO: properly handle cases where the build system isn't present
 
 odin_invocation :: proc(build: Build, allocator := context.allocator) {
+    context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
+    defer log.destroy_console_logger(context.logger)
+    build := build
+
     err := verify_build(build)
     if err != "" {
         fmt.eprintln(err)
-        os.exit(E_VERIFICATION_FAILED)
+        os.exit(VERIFICATION_FAILED)
     }
 
-    err = process_build(build.install_path)
+    // FIXME: apply to build immediately before verification
+    build.install_dir = build.install_dir if build.install_dir != "" else DEFAULT_INSTALL_DIR
+
+    err = install_missing_dependencies(build.install_dir)
 
     cmdline := build_invocation(build, allocator)
     if build.print_odin_invocation {
         fmt.println(cmdline)
     }
-    fmt.printfln("DEBUG %#v", g_build_info.dependencies)
 
     if exitcode := libc.system(cmdline); exitcode != 0 {
         // odin will have printed to stderr
-        os.exit(E_ODIN_INVOCATION_FAILED)
+        os.exit(ODIN_INVOCATION_FAILED)
     }
 }
 
@@ -79,7 +89,7 @@ verify_build :: proc(
 
     // FIXME: we may want to apply verification to arch specific flags
 
-    return verify_dependencies(build.install_path, allocator)
+    return verify_dependencies(build.install_dir, allocator)
 }
 // odinfmt: enable
 
@@ -101,17 +111,6 @@ verify_src_path :: proc(
 
     defer os.file_info_delete(stat, allocator)
     return !stat.is_dir, true
-}
-
-@(private)
-process_build :: proc(install_path: string) -> (err: string) {
-    for _, dependency in g_build_info.dependencies {
-        err = install_missing_dependencies(install_path)
-        // FIXME: remove
-        err = resolve_dependency(dependency)
-        if err != "" do return
-    }
-    return ""
 }
 
 @(private)

@@ -2,12 +2,11 @@ package grumm
 
 import "core:os"
 import "core:fmt"
+import "core:log"
 import "core:c/libc"
 import "core:strings"
 import "core:path/filepath"
 
-// TODO: dependencies installation dir
-// TODO: allow optional dependencies?
 // TODO: define ways how to build a dependency? (in case of compiled code)
 Dependency :: struct {
     name:    string,
@@ -44,6 +43,8 @@ GitSubmodule :: struct {
     using opts: GitSubmoduleOptions,
 }
 
+// branch, tag and commit are mutually exclusive, as tags behave like commits
+// and those are unique accross all branches. A branch being set implies its last commit is to be used.
 GitSubmoduleOptions :: struct {
     branch:                string,
     tag:                   string,
@@ -52,7 +53,7 @@ GitSubmoduleOptions :: struct {
     ignore_submodules:     bool,
     // the path where a Git submodule is supposed to be placed, this must only be specified when this is
     // different from the default path ($Build.install_dir/$dependency_name). Path starts from the project root.
-    install_path: string,
+    install_path:          string,
 }
 
 // a processed dependency
@@ -62,8 +63,10 @@ Collection :: struct {
     path: string,
 }
 
+// TODO: maybe have a const and non const variant, with comptime validation on the former
+
 // odinfmt: disable
-// Params:
+// Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
 add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
     fmt.assertf(name not_in g_build_info.dependencies, "duplicate dependency %s", name)
@@ -73,7 +76,7 @@ add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
     }
 }
 
-// Params:
+// Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
 add_git_submodule :: proc(name: string, url: string, opts := GitSubmoduleOptions{}) {
     fmt.assertf(name not_in g_build_info.dependencies, "duplicate dependency %s", name)
@@ -128,6 +131,10 @@ verify_dependency :: proc(
             return fmt.tprintf("Dependency %s does not have a valid git url", name)
         }
 
+        if variant.url == "" {
+            return fmt.tprintf("Dependency %s does not have its git url set")
+        }
+
         if variant.commit != "" {
             hash_len := len(variant.commit)
             if hash_len < min_commit_hash_len || hash_len > max_commit_hash_len {
@@ -147,6 +154,23 @@ verify_dependency :: proc(
                 )
             }
         }
+        
+        // ensure only one of {branch, tag, commit} is set
+        opts := [?]string{variant.branch, variant.tag, variant.commit}
+        opt_set := -1
+
+        for opt, i in opts {
+            if opt_set != -1 && opt != "" {
+                switch opt_set {
+                case 0: return fmt.tprintfln("Dependency %s has its git branch set, and must not have a tag or commit set", name)
+                case 1: return fmt.tprintfln("Dependency %s has its git tag set, and must not have a branch or commit set", name)
+                case 2: return fmt.tprintfln("Dependency %s has its git commit set, and must not have a branch or tag set", name)
+                }
+            }
+            if opt != "" {
+                opt_set = i
+            }
+        }
     }
 
     return ""
@@ -163,13 +187,12 @@ max_commit_hash_len :: 40
 
 // cannot assign multi value expression to globals
 @(private)
-illegal_name_chars := get_illegal_name_chars()
+illegal_name_chars := get_illegal_char_names()
 
+// TODO: remove and replace with or_else in assignment, currently gives an lsp error
 @(private)
-get_illegal_name_chars := proc() -> strings.Ascii_Set {
-    set, ok := strings.ascii_set_make(illegal_name_chars_str)
-    assert(ok, "sanity check")
-    return set
+get_illegal_char_names :: proc() -> strings.Ascii_Set {
+    return strings.ascii_set_make(illegal_name_chars_str) or_else panic("sanity check")
 }
 
 @(private)
@@ -183,47 +206,63 @@ is_valid_dependency_name :: proc(name: string) -> bool {
 }
 
 @(private)
-is_dependency_present :: proc(install_path, name: string) -> bool {
-    return os.exists(filepath.join({install_path, name}, context.temp_allocator))
+is_dependency_present :: proc(install_dir, name: string) -> bool {
+    return os.exists(filepath.join({install_dir, name}, context.temp_allocator))
 }
 
 @(private)
-install_missing_dependencies :: proc(install_path: string) -> (err: string) {
+install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
     // only consider Git submodules, as code source dirs are verified to exist
     for name, dep in g_build_info.dependencies {
-        variant := dep.variant.(GitSubmodule) or_continue
-        if !is_dependency_present(install_path, name) {
-
+        submodule := dep.variant.(GitSubmodule) or_continue
+        if is_dependency_present(install_dir, name) {
+            log.debugf("Dependency %s is present and does not need to be cloned", name)
+            continue
         }
+
+        sb := strings.builder_make(context.temp_allocator)
+        strings.write_string(&sb, "git clone --quiet ")
+
+        switch {
+        case submodule.branch != "": fmt.sbprintf(&sb, "-b %s ", submodule.branch)
+        case submodule.tag != "":    fmt.sbprintf(&sb, "-b %s ", submodule.tag)
+        }
+
+        if submodule.ignore_submodules {
+            strings.write_string(&sb, "-ignore-submodules ")
+        }
+
+        install_path := submodule.install_path
+        if install_path == "" {
+            install_path = filepath.join({install_dir, name}, context.temp_allocator)
+        }
+
+        strings.write_string(&sb, submodule.url)
+        // TODO: append space
+        strings.write_string(&sb, install_path)
+
+        commandline := strings.to_cstring(&sb)
+        fmt.println(commandline)
+        if exitcode := libc.system(commandline); exitcode != 0 {
+            return fmt.tprintf(
+                "Dependency %s: failed cloning repo with url %s and commandline %s",
+                name, submodule.url, commandline,
+            )
+        }
+
+        if submodule.commit != "" {
+            // reset dependency to specific commit
+            exitcode := libc.system(fmt.ctprintf("git checkout --no-overlay --quiet %s -- %s", submodule.commit, install_path))
+            if exitcode != 0 {
+                return fmt.tprintf(
+                    "Dependency %s: successfully cloned repo but checking out commit %s failed",
+                    name, submodule.commit,
+                )
+            }
+        }
+
+        log.infof("Cloned git repo %s", submodule.url)
     }
+
     return
 }
-
-// odinfmt: disable
-@(private)
-resolve_dependency :: proc(dep: Dependency) -> (err: string) {
-    switch variant in dep.variant {
-    case CodeSource:
-        append(&g_build_info.collections, Collection {
-            name = dep.name,
-            path = variant.path,
-        })
-    case GitSubmodule:
-        // TODO: access lockfile for previous versions
-        branch_opt: string
-        switch {
-        case variant.branch != "": branch_opt = variant.branch
-        case variant.tag != "": branch_opt = variant.tag
-        case variant.commit != "": branch_opt = variant.commit
-        case: return // dependency is locked to this point
-        }
-
-        // clone if necessary (target isn't hardcoded and target is the same for atleast two runs)
-        commandline := fmt.ctprintf("git clone --depth 1 -b %s %s", branch_opt, variant.url)
-        if exitcode := libc.system(commandline); exitcode != 0 {
-            return fmt.tprintf("Git clone failed with exitcode %d for dependency %s", exitcode, dep.name)
-        }
-    }
-    return ""
-}
-// odinfmt: enable
