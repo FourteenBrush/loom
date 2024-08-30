@@ -7,10 +7,13 @@ import "core:c/libc"
 import "core:strings"
 import "core:path/filepath"
 
-VERIFICATION_FAILED :: 1
-ODIN_INVOCATION_FAILED :: 2
-INSTALLATION_FAILED :: 3
-DEFAULT_INSTALL_DIR :: "dependencies"
+// odinfmt: disable
+VERIFICATION_FAILED     :: 1
+ODIN_INVOCATION_FAILED  :: 2
+INSTALLATION_FAILED     :: 3
+DUPLICATED_DEPENDENCY   :: 4
+DEFAULT_INSTALL_DIR     :: "dependencies"
+// odinfmt: enable
 
 // TODO: properly handle cases where the build system isn't present
 
@@ -178,7 +181,7 @@ build_invocation :: proc(build: Build, allocator := context.allocator) -> cstrin
 	
     // odinfmt: disable
     switch build.build_mode {
-    case .Exe: // TODO: is this implied by default?
+    case .Exe:       // default
     case .SharedLib: fmt.sbprint(&sb, "-build-mode:shared ")
     case .StaticLib: fmt.sbprint(&sb, "-build-mode:static ")
     case .Obj:       fmt.sbprint(&sb, "-build-mode:obj ")
