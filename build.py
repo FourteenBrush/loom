@@ -64,7 +64,6 @@ class BuildArgs(argparse.Namespace):
 
 def parse_args() -> BuildArgs:
     """Exits if parsing failed"""
-    # TODO: custom formatter class with more spacing between parameters and description
     parser = argparse.ArgumentParser(allow_abbrev=False)
 
     # TODO: rethink this design of defining some options twice

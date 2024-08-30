@@ -5,7 +5,7 @@ ErrorMsg :: string
 
 // Structures as defined in the `odin build` command.
 
-// TODO: currently: some options are left as default before providing them to the user, e.g. install_dir
+// TODO: currently some options are left as default before providing them to the user, e.g. install_dir
 // TODO: revision https://github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/main.cpp#L506
 //odinfmt: disable
 Build :: struct {
@@ -42,7 +42,6 @@ Build :: struct {
     vet_flags:              VetFlags,
     defines:                [dynamic]Define,
     custom_attributes:      [dynamic]string,
-    dependencies:           [dynamic]Dependency,
 
     print_odin_invocation:  bool,
 }
