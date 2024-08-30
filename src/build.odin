@@ -95,6 +95,8 @@ CompilationTarget :: enum {
     FreestandingAmd64Win64,
     FreestandingArm64,
     FreestandingArm32,
+
+    Riscv64,
 }
 // odinfmt: enable
 
@@ -128,6 +130,7 @@ target_to_str := [CompilationTarget]string {
     .FreestandingAmd64Win64 = "freestanding_amd_64_win64",
     .FreestandingArm64      = "freestanding_arm64",
     .FreestandingArm32      = "freestanding_arm32",
+    .Riscv64                = "freestanding_riscv64",
 }
 
 RelocMode :: enum {
