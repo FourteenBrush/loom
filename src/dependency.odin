@@ -7,12 +7,13 @@ import "core:c/libc"
 import "core:strings"
 import "core:path/filepath"
 
-// TODO: define ways how to build a dependency? (in case of compiled code)
+// FIXME: define ways how to build a dependency? (in case of compiled code)
 Dependency :: struct {
     name:    string,
     variant: DependencyVariant,
 }
 
+@(private)
 DependencyVariant :: union {
     CodeSource,
     GitSubmodule,
@@ -21,13 +22,6 @@ DependencyVariant :: union {
 @(private)
 CodeSource :: struct {
     using opts: CodeSourceOptions,
-}
-
-duck := Dependency {
-    name = "duck",
-    variant = CodeSource {
-        install_path = "dependencies/duckdb",
-    },
 }
 
 CodeSourceOptions :: struct {
@@ -53,6 +47,7 @@ GitSubmoduleOptions :: struct {
     ignore_submodules:     bool,
     // the path where a Git submodule is supposed to be placed, this must only be specified when this is
     // different from the default path ($Build.install_dir/$dependency_name). Path starts from the project root.
+    // TODO: add possibility to simply rename dependency
     install_path:          string,
 }
 
@@ -63,13 +58,16 @@ Collection :: struct {
     path: string,
 }
 
-// TODO: maybe have a const and non const variant, with comptime validation on the former
+// FIXME: maybe have a const and non const variant, with comptime validation on the former
 
 // odinfmt: disable
 // Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
 add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
-    fmt.assertf(name not_in g_build_info.dependencies, "duplicate dependency %s", name)
+    if name in g_build_info.dependencies {
+        fmt.eprintln("Duplicate dependency", name)
+        os.exit(DUPLICATED_DEPENDENCY)
+    }
     g_build_info.dependencies[name] = Dependency {
         name = name,
         variant = CodeSource { opts = opts },
@@ -79,7 +77,10 @@ add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
 // Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
 add_git_submodule :: proc(name: string, url: string, opts := GitSubmoduleOptions{}) {
-    fmt.assertf(name not_in g_build_info.dependencies, "duplicate dependency %s", name)
+    if name in g_build_info.dependencies {
+        fmt.eprintln("Duplicate dependency", name)
+        os.exit(DUPLICATED_DEPENDENCY)
+    }
     g_build_info.dependencies[name] = Dependency {
         name = name,
         variant = GitSubmodule { url = url, opts = opts },
@@ -187,13 +188,7 @@ max_commit_hash_len :: 40
 
 // cannot assign multi value expression to globals
 @(private)
-illegal_name_chars := get_illegal_char_names()
-
-// TODO: remove and replace with or_else in assignment, currently gives an lsp error
-@(private)
-get_illegal_char_names :: proc() -> strings.Ascii_Set {
-    return strings.ascii_set_make(illegal_name_chars_str) or_else panic("sanity check")
-}
+illegal_name_chars := strings.ascii_set_make(illegal_name_chars_str) or_else panic("sanity check")
 
 @(private)
 is_valid_dependency_name :: proc(name: string) -> bool {
@@ -229,20 +224,18 @@ install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
         }
 
         if submodule.ignore_submodules {
-            strings.write_string(&sb, "-ignore-submodules ")
+            strings.write_string(&sb, "--ignore-submodules ")
         }
 
-        install_path := submodule.install_path
-        if install_path == "" {
-            install_path = filepath.join({install_dir, name}, context.temp_allocator)
+        if submodule.install_path == "" {
+            submodule.install_path = filepath.join({install_dir, name}, context.temp_allocator)
         }
 
-        strings.write_string(&sb, submodule.url)
-        // TODO: append space
-        strings.write_string(&sb, install_path)
+        fmt.sbprintf(&sb, "%s %s", submodule.url, submodule.install_path)
 
         commandline := strings.to_cstring(&sb)
-        fmt.println(commandline)
+        log.debug(commandline)
+
         if exitcode := libc.system(commandline); exitcode != 0 {
             return fmt.tprintf(
                 "Dependency %s: failed cloning repo with url %s and commandline %s",
@@ -252,7 +245,7 @@ install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
 
         if submodule.commit != "" {
             // reset dependency to specific commit
-            exitcode := libc.system(fmt.ctprintf("git checkout --no-overlay --quiet %s -- %s", submodule.commit, install_path))
+            exitcode := libc.system(fmt.ctprintf("git checkout --no-overlay --quiet %s -- %s", submodule.commit, submodule.install_path))
             if exitcode != 0 {
                 return fmt.tprintf(
                     "Dependency %s: successfully cloned repo but checking out commit %s failed",
