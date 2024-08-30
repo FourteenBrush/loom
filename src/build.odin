@@ -5,14 +5,14 @@ ErrorMsg :: string
 
 // Structures as defined in the `odin build` command.
 
+// TODO: currently: some options are left as default before providing them to the user, e.g. install_dir
 // TODO: revision https://github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/main.cpp#L506
 //odinfmt: disable
 Build :: struct {
-    // FIXME: what about multiple sources? globs? default assumption src is always in "src" dir?
     src_path:               string,
     out_filepath:           string,
     // location for the dependencies directory, "dependencies" if not specified
-    install_path:           string,
+    install_dir:            string,
     optimization:           OptimizationMode,
     // exports
     timings_export:         TimingsExport,
@@ -22,7 +22,9 @@ Build :: struct {
     build_mode:             BuildMode,
     target:                 CompilationTarget,
     // only used when target is Darwin
+    subtarget:              CompilationSubTarget,
     minimum_os_version:     string,
+
     extra_linker_flags:     string,
     extra_assembler_flags:  string,
     microarch:              string,
@@ -97,6 +99,11 @@ CompilationTarget :: enum {
     FreestandingArm32,
 
     Riscv64,
+}
+
+CompilationSubTarget :: enum {
+    None,
+    IOS,
 }
 // odinfmt: enable
 
