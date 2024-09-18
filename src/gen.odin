@@ -15,31 +15,26 @@ DUPLICATED_DEPENDENCY   :: 4
 DEFAULT_INSTALL_DIR     :: "dependencies"
 // odinfmt: enable
 
-// TODO: properly handle cases where the build system isn't present
-
-odin_invocation :: proc(build: Build, allocator := context.allocator) {
+odin_invocation :: proc(build: ^Build, allocator := context.allocator) {
 	context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
 	defer log.destroy_console_logger(context.logger)
 
-	err := verify_build(build)
-	if err != "" {
-		fmt.eprintln(err)
-		os.exit(VERIFICATION_FAILED)
-	}
+    if err := verify_build(build^); err != "" {
+        fmt.eprintln(err)
+        os.exit(VERIFICATION_FAILED)
+    }
 
 	// FIXME: apply to build immediately before verification
-	build := build
 	if build.install_dir == "" {
 		build.install_dir = DEFAULT_INSTALL_DIR
 	}
 
-	err = install_missing_dependencies(build.install_dir)
-	if err != "" {
-		fmt.eprintln(err)
-		os.exit(INSTALLATION_FAILED)
-	}
+    if err := install_missing_dependencies(build.install_dir); err != "" {
+        fmt.eprintln(err)
+        os.exit(INSTALLATION_FAILED)
+    }
 
-	cmdline := build_invocation(build, allocator)
+	cmdline := build_invocation(build^, allocator)
 	if build.print_odin_invocation {
 		fmt.println(cmdline)
 	}
@@ -117,7 +112,7 @@ verify_src_path :: proc(
 	self_contained, ok: bool,
 ) {
 	stat, errno := os.stat(src, allocator)
-	if errno != os.ERROR_NONE {
+	if errno != nil {
 		// fallback to make caller able to provide a more accurate error message
 		self_contained = filepath.ext(src) == ".odin"
 		return

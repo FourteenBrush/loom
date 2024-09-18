@@ -8,13 +8,9 @@ import "core:strings"
 import "core:path/filepath"
 
 // FIXME: define ways how to build a dependency? (in case of compiled code)
-Dependency :: struct {
-    name:    string,
-    variant: DependencyVariant,
-}
 
 @(private)
-DependencyVariant :: union {
+Dependency :: union {
     CodeSource,
     GitSubmodule,
 }
@@ -68,10 +64,7 @@ add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
         fmt.eprintln("Duplicate dependency", name)
         os.exit(DUPLICATED_DEPENDENCY)
     }
-    g_build_info.dependencies[name] = Dependency {
-        name = name,
-        variant = CodeSource { opts = opts },
-    }
+    g_build_info.dependencies[name] = CodeSource { opts = opts }
 }
 
 // Inputs:
@@ -81,10 +74,7 @@ add_git_submodule :: proc(name: string, url: string, opts := GitSubmoduleOptions
         fmt.eprintln("Duplicate dependency", name)
         os.exit(DUPLICATED_DEPENDENCY)
     }
-    g_build_info.dependencies[name] = Dependency {
-        name = name,
-        variant = GitSubmodule { url = url, opts = opts },
-    }
+    g_build_info.dependencies[name] = GitSubmodule { url = url, opts = opts }
 }
 // odinfmt: enable
 
@@ -102,7 +92,7 @@ verify_dependencies :: proc(install_path: string, allocator := context.allocator
 @(private)
 verify_dependency :: proc(
     name: string,
-    dep: Dependency,
+    dependency: Dependency,
     install_path: string,
     allocator := context.allocator,
 ) -> ErrorMsg {
@@ -115,10 +105,10 @@ verify_dependency :: proc(
         )
     }
 
-    switch variant in dep.variant {
+    switch dependency in dependency {
     case CodeSource:
-        sources_loc := variant.install_path if variant.install_path != "" \
-            else filepath.join({install_path, dep.name}, allocator)
+        sources_loc := dependency.install_path if dependency.install_path != "" else
+            filepath.join({install_path, name}, allocator)
 
         if !os.is_dir(sources_loc) {
             return fmt.tprintf(
@@ -128,48 +118,46 @@ verify_dependency :: proc(
         }
     case GitSubmodule:
         // our best effort to check for valid urls FIXME
-        if !strings.contains(variant.url, ".git") {
+        if !strings.contains(dependency.url, ".git") {
             return fmt.tprintf("Dependency %s does not have a valid git url", name)
         }
 
-        if variant.url == "" {
+        if dependency.url == "" {
             return fmt.tprintf("Dependency %s does not have its git url set")
         }
 
-        if variant.commit != "" {
-            hash_len := len(variant.commit)
-            if hash_len < min_commit_hash_len || hash_len > max_commit_hash_len {
-                return fmt.tprintf(
-                    "Dependency %s does not have a valid commit hash, length must be between %d and %d",
-                    name, min_commit_hash_len, max_commit_hash_len,
-                )
-            }
-
-            for _, i in variant.commit {
-                c := variant.commit[i]
-                if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' do continue
-
-                return fmt.tprintf(
-                    "Dependency %s does not have its commit match pattern [a-f0-9]{{%d,%d}",
-                    name, min_commit_hash_len, max_commit_hash_len,
-                )
-            }
-        }
-        
         // ensure only one of {branch, tag, commit} is set
-        opts := [?]string{variant.branch, variant.tag, variant.commit}
+        opts := [?]string{dependency.branch, dependency.tag, dependency.commit}
         opt_set := -1
 
-        for opt, i in opts {
-            if opt_set != -1 && opt != "" {
+        for opt, i in opts do if opt != "" {
+            if opt_set != -1 {
                 switch opt_set {
                 case 0: return fmt.tprintfln("Dependency %s has its git branch set, and must not have a tag or commit set", name)
                 case 1: return fmt.tprintfln("Dependency %s has its git tag set, and must not have a branch or commit set", name)
                 case 2: return fmt.tprintfln("Dependency %s has its git commit set, and must not have a branch or tag set", name)
                 }
             }
-            if opt != "" {
-                opt_set = i
+            opt_set = i
+        }
+
+        if dependency.commit != "" {
+            hash_len := len(dependency.commit)
+            if hash_len < MIN_COMMIT_HAS_LEN || hash_len > MAX_COMMIT_HASH_LEN {
+                return fmt.tprintf(
+                    "Dependency %s does not have a valid commit hash, length must be between %d and %d",
+                    name, MIN_COMMIT_HAS_LEN, MAX_COMMIT_HASH_LEN,
+                )
+            }
+
+            for _, i in dependency.commit {
+                c := dependency.commit[i]
+                if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' do continue
+
+                return fmt.tprintf(
+                    "Dependency %s does not have its commit match pattern [a-f0-9]{{%d,%d}",
+                    name, MIN_COMMIT_HAS_LEN, MAX_COMMIT_HASH_LEN,
+                )
             }
         }
     }
@@ -177,16 +165,12 @@ verify_dependency :: proc(
     return ""
 }
 // odinfmt: enable
-
 @(private)
 illegal_name_chars_str :: `./\`
 
-@(private)
-min_commit_hash_len :: 7
-@(private)
-max_commit_hash_len :: 40
+MIN_COMMIT_HAS_LEN :: 7
+MAX_COMMIT_HASH_LEN :: 40
 
-// cannot assign multi value expression to globals
 @(private)
 illegal_name_chars := strings.ascii_set_make(illegal_name_chars_str) or_else panic("sanity check")
 
@@ -208,15 +192,15 @@ is_dependency_present :: proc(install_dir, name: string) -> bool {
 @(private)
 install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
     // only consider Git submodules, as code source dirs are verified to exist
-    for name, dep in g_build_info.dependencies {
-        submodule := dep.variant.(GitSubmodule) or_continue
+    for name, dependency in g_build_info.dependencies {
+        submodule := dependency.(GitSubmodule) or_continue
         if is_dependency_present(install_dir, name) {
             log.debugf("Dependency %s is present and does not need to be cloned", name)
             continue
         }
 
         sb := strings.builder_make(context.temp_allocator)
-        strings.write_string(&sb, "git clone --quiet ")
+        strings.write_string(&sb, "git clone -q ")
 
         switch {
         case submodule.branch != "": fmt.sbprintf(&sb, "-b %s ", submodule.branch)
@@ -234,7 +218,7 @@ install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
         fmt.sbprintf(&sb, "%s %s", submodule.url, submodule.install_path)
 
         commandline := strings.to_cstring(&sb)
-        log.debug(commandline)
+        log.debugf("Cloning submodule %s with git invocation %d", name, commandline)
 
         if exitcode := libc.system(commandline); exitcode != 0 {
             return fmt.tprintf(
@@ -245,8 +229,8 @@ install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
 
         if submodule.commit != "" {
             // reset dependency to specific commit
-            exitcode := libc.system(fmt.ctprintf("git checkout --no-overlay --quiet %s -- %s", submodule.commit, submodule.install_path))
-            if exitcode != 0 {
+            commandline := fmt.ctprintf("git checkout --no-overlay --quiet %s -- %s", submodule.commit, submodule.install_path)
+            if exitcode := libc.system(commandline); exitcode != 0 {
                 return fmt.tprintf(
                     "Dependency %s: successfully cloned repo but checking out commit %s failed",
                     name, submodule.commit,

@@ -7,7 +7,6 @@ main :: proc() {
 		src_path              = "src",
 		out_filepath          = "out/grumm",
         build_mode            = .SharedLib,
-		optimization          = .None,
 		timings_export        = {mode = .Verbose},
 		flags                 = {.UseSeparateModules, .Debug, .NoEntryPoint},
 		print_odin_invocation = true,
