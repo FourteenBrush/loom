@@ -2,9 +2,9 @@
 /*.exe
 /*.pdb
 /*.o
-grumm
+loom
 # do not ignore build system
-!grumm/
+!loom/
 out/
 # LLVM IR
 /*.ll

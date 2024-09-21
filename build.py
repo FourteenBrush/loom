@@ -44,7 +44,7 @@ def main():
     ]
 
     compiler_argv.extend(
-        f'-define:GRUMM_{prop.upper()}={value}'
+        f'-define:LOOM_{prop.upper()}={value}'
         for prop, value in vars(args).items()
         if value and prop in ['install_path', 'output_path']
     )
@@ -85,7 +85,7 @@ def update_self():
 
 
 def bootstrap_build_sys(install_path: str) -> int:
-    build_sys_dir = path.join(os.getcwd(), install_path, 'grumm')
+    build_sys_dir = path.join(os.getcwd(), install_path, 'loom')
     if path.exists(build_sys_dir): return 0
 
     # TODO: do we really need a distinct case apart from just git cloning?
@@ -100,7 +100,7 @@ def bootstrap_build_sys(install_path: str) -> int:
     return subprocess.call(cmd)
 
 
-# git config -f .gitmodules --get 'submodule.dependencies/grumm.url' 
+# git config -f .gitmodules --get 'submodule.dependencies/loom.url' 
 def has_build_submodule() -> bool:
     config = configparser.ConfigParser()
     config.read('.gitmodules')
