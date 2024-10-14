@@ -2,17 +2,88 @@ package loom
 
 import "core:os"
 import "core:fmt"
-import "core:log"
 import "core:c/libc"
 import "core:strings"
 import "core:path/filepath"
 
 DEFAULT_INSTALL_DIR :: "dependencies"
 
+build :: proc(build: Build) {
+    if len(build.root_step.dependencies) == 0 {
+        warn("build root step does not have any dependencies, no work is performed")
+        return
+    }
+
+    traversal := make([dynamic]^Step, build.allocator)
+    stack := make([dynamic]^Step, build.allocator)
+    _root := build.root_step
+    append(&stack, &_root)
+
+    for len(stack) > 0 {
+        step := pop(&stack)
+        append(&traversal, step)
+
+        for &dependency in step.dependencies {
+            append(&stack, &dependency)
+        }
+    }
+
+    #reverse for step in traversal {
+        fmt.println(step.name)
+    }
+
+    if true do return
+
+    //Pair :: struct {step: ^Step, idx: int}
+    //root := build.root_step
+    //stack := make([dynamic]Pair, build.allocator)
+    //traversal := make([dynamic]^Step, build.allocator)
+    //curr_root_idx := 0
+    //
+    //for root.dependencies != nil || len(stack) > 0 {
+    //    if root.dependencies != nil {
+    //        append(&stack, Pair {&root, curr_root_idx})
+    //        curr_root_idx = 0
+    //
+    //        if len(root.dependencies) > 0 {
+    //            root = root.dependencies[0]
+    //        } else {
+    //            root = {}
+    //        }
+    //    }
+    //}
+    //
+    //tmp := pop(&stack)
+    //pop(&stack)
+    //append(&traversal, tmp.step)
+    //
+    //if len(stack) > 0 {
+    //    root = stack[len(stack)-1].step.dependencies[tmp.idx+1]
+    //    curr_root_idx = tmp.idx + 1
+    //}
+    //
+    //for step in traversal {
+    //    fmt.println(step.name)
+    //}
+
+    info("build finished")
+}
+
+@(private)
+tree_height :: proc(step: Step) -> int {
+    if step.dependencies == nil do return 0
+
+    max_heigth := 0
+    for dependency in step.dependencies {
+        max_heigth = max(tree_height(dependency), max_heigth)
+    }
+    return max_heigth + 1
+}
+
 // TODO: rename build param, delete
-odin_invocation :: proc(build: ^BuildStepOpts, allocator := context.allocator) {
-	context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
-	defer log.destroy_console_logger(context.logger)
+odin_invocation :: proc(build: ^BuildConfig, allocator := context.allocator) {
+	//context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
+	//defer log.destroy_console_logger(context.logger)
 
 	if err := verify_build(build^); err != "" {
 		fatal(err)
@@ -32,7 +103,6 @@ odin_invocation :: proc(build: ^BuildStepOpts, allocator := context.allocator) {
 		fmt.println(cmdline)
 	}
 
-	// TODO: execve instead of system
 	if exitcode := libc.system(cmdline); exitcode != 0 {
 		// odin will have printed to stderr
 		fatal()
@@ -54,7 +124,7 @@ g_build_info: BuildInfo
 // TODO: rename build param
 @(private)
 verify_build :: proc(
-    build: BuildStepOpts,
+    build: BuildConfig,
     allocator := context.allocator,
 ) -> (err: string) {
     self_contained, ok := verify_src_path(build.src_path, allocator)
@@ -118,7 +188,7 @@ verify_src_path :: proc(
 
 // TODO: rename build param
 @(private)
-build_invocation :: proc(build: BuildStepOpts, allocator := context.allocator) -> cstring {
+build_invocation :: proc(build: BuildConfig, allocator := context.allocator) -> cstring {
 	sb := strings.builder_make(0, 512, allocator)
 	fmt.sbprint(&sb, "odin build ")
 
@@ -250,4 +320,27 @@ build_invocation :: proc(build: BuildStepOpts, allocator := context.allocator) -
 
 	strings.pop_byte(&sb)
 	return strings.to_cstring(&sb)
+}
+
+// TODO: logger cannot be initialized because build system does not act as the entrypoint
+// but as a dependency that gets called into, so we cannot modify the context of the higher
+// stackframe, convert this back to a logger when this gets fixed
+
+@(private)
+info :: proc(args: ..any) {
+    fmt.println(..args)
+}
+
+@(private)
+warn :: proc(args: ..any) {
+    dest := make([]any, len(args) + 1, context.temp_allocator)
+    copy(dest[1:], args[:])
+    dest[0] = "warning:"
+    fmt.println(args=dest)
+}
+
+@(private)
+fatal :: proc(args: ..any) -> ! {
+    fmt.eprintln(..args)
+    os.exit(1)
 }
