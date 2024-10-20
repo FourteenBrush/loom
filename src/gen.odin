@@ -204,10 +204,11 @@ build_invocation :: proc(build: BuildConfig, allocator := context.allocator) -> 
 	
     // odinfmt: disable
     switch build.optimization {
-    case .None:    fmt.sbprint(&sb, "-o:none ")
-    case .Minimal: // default
-    case .Size:    fmt.sbprint(&sb, "-o:size ")
-    case .Speed:   fmt.sbprint(&sb, "-o:speed ")
+    case .None:       fmt.sbprint(&sb, "-o:none ")
+    case .Minimal:    // default
+    case .Size:       fmt.sbprint(&sb, "-o:size ")
+    case .Speed:      fmt.sbprint(&sb, "-o:speed ")
+    case .Aggressive: fmt.sbprint(&sb, "-o:aggressive")
     }
 
     timings_export: {

@@ -140,6 +140,7 @@ Flag :: enum {
     NoThreadedChecker,
     IgnoreUnknownAttributes,
     NoEntryPoint,
+    NoRPath,
     StrictTargetFeatures,
     DisableRedZone,
     DynamicMapCalls,
@@ -171,6 +172,7 @@ flag_to_str := [Flag]string {
     .NoThreadedChecker            = "-no-threaded-checker",
     .IgnoreUnknownAttributes      = "-ignore-unknown-attributes",
     .NoEntryPoint                 = "-no-entry-point",
+    .NoRPath                      = "-no-rpath",
     .StrictTargetFeatures         = "-strict-target-features",
     .DisableRedZone               = "-disable-red-zone",
     .DynamicMapCalls              = "-dynamic-map-calls",
@@ -252,10 +254,11 @@ DependenciesExportFormat :: enum {
 }
 
 OptimizationMode :: enum {
-    None    = 1,
-    Minimal = 0,
-    Size    = 2,
-    Speed   = 3,
+    None       = 1,
+    Minimal    = 0,
+    Size       = 2,
+    Speed      = 3,
+    Aggressive = 4,
 }
 
 Sanitization :: bit_set[SanitizeMode]
