@@ -311,6 +311,10 @@ build_invocation :: proc(build: BuildConfig, allocator := context.allocator) -> 
 		fmt.sbprint(&sb, vet_flag_to_str[flag], ' ')
 	}
 
+    if build.vet_packages != "" {
+        fmt.sbprint(&sb, "-vet-packages:%s ", build.vet_packages)
+    }
+
 	for define in build.defines {
 		fmt.sbprintf(&sb, "-define:%s=%v ", define.name, define.value)
 	}

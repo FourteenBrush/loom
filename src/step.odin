@@ -77,6 +77,8 @@ BuildConfig :: struct {
 
     flags:                  Flags,
     vet_flags:              VetFlags,
+    // comma-separated list of package-names
+    vet_packages:           string,
     defines:                [dynamic]Define,
     custom_attributes:      [dynamic]string,
 
