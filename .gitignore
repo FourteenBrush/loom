@@ -10,3 +10,5 @@ out/
 /*.ll
 # Taskfile checksums
 .task
+# dependencies are handled by the build system itself
+dependencies/
