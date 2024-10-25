@@ -57,27 +57,27 @@ Collection :: struct {
 // odinfmt: disable
 // Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
-add_code_source :: proc(name: string, opts := CodeSourceOptions{}) {
-    if name in g_build_info.dependencies {
+add_code_source :: proc(config: ^BuildConfig, name: string, opts := CodeSourceOptions{}) {
+    if name in config._dependencies {
         fatal("duplicated dependency", name)
     }
-    g_build_info.dependencies[name] = CodeSource { opts = opts }
+    config._dependencies[name] = CodeSource { opts = opts }
 }
 
 // Inputs:
 //  - name: the name of the underlying collection going to be defined in the source code
-add_git_submodule :: proc(name: string, url: string, opts := GitSubmoduleOptions{}) {
-    if name in g_build_info.dependencies {
+add_git_submodule :: proc(config: ^BuildConfig, name: string, url: string, opts := GitSubmoduleOptions{}) {
+    if name in config._dependencies {
         fatal("duplicated dependency", name)
     }
-    g_build_info.dependencies[name] = GitSubmodule { url = url, opts = opts }
+    config._dependencies[name] = GitSubmodule { url = url, opts = opts }
 }
 // odinfmt: enable
 
 @(private)
-verify_dependencies :: proc(install_path: string, allocator := context.allocator) -> (err: string) {
-    for name, dependency in g_build_info.dependencies {
-        err := verify_dependency(name, dependency, install_path, allocator)
+verify_dependencies :: proc(config: BuildConfig, allocator := context.allocator) -> (err: string) {
+    for name, dependency in config._dependencies {
+        err := verify_dependency(name, dependency, config.install_dir, allocator)
         if err != "" do return err
     }
 
@@ -186,11 +186,11 @@ is_dependency_present :: proc(install_dir, name: string) -> bool {
 }
 
 @(private)
-install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
+install_missing_dependencies :: proc(config: BuildConfig) -> (err: string) {
     // only consider Git submodules, as code source dirs are verified to exist
-    for name, dependency in g_build_info.dependencies {
+    for name, dependency in config._dependencies {
         submodule := dependency.(GitSubmodule) or_continue
-        if is_dependency_present(install_dir, name) {
+        if is_dependency_present(config.install_dir, name) {
             log.debugf("Dependency %s is present and does not need to be cloned", name)
             continue
         }
@@ -208,7 +208,7 @@ install_missing_dependencies :: proc(install_dir: string) -> (err: string) {
         }
 
         if submodule.install_path == "" {
-            submodule.install_path = filepath.join({install_dir, name}, context.temp_allocator)
+            submodule.install_path = filepath.join({config.install_dir, name}, context.temp_allocator)
         }
 
         fmt.sbprintf(&sb, "%s %s", submodule.url, submodule.install_path)
