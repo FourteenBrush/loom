@@ -2,19 +2,26 @@ package loom
 
 import "core:mem"
 
+// A single unit of work, all data is allocated with the Build allocator.
 Step :: struct {
-    // TODO: replace with Id? just like zig does
-    name: string,
-    // allocated with Build allocator to extend lifetime
+    id: StepId,
     // TODO: union instead of rawptr?
     data: any,
     dependencies: [dynamic]Step,
 }
 
+StepId :: enum {
+    Root,
+    Check,
+    Build,
+    Run,
+    SystemCommand,
+}
+
 @(private)
-make_step :: proc(name: string, data: ^$D, allocator: mem.Allocator) -> Step {
+make_step :: proc(id: StepId, data: ^$D, allocator: mem.Allocator) -> Step {
     return {
-        name=name,
+        id=id,
         data=mem.make_any(data, typeid_of(D)),
         dependencies=make([dynamic]Step, allocator),
     }
@@ -28,7 +35,7 @@ step_depends_on :: proc(step: ^Step, dependency: Step) {
 @(require_results)
 add_check_step :: proc(build: ^Build, opts := CheckStepOpts{}) -> Step {
     data := new_clone(opts, build.allocator)
-    return make_step("check", data, build.allocator)
+    return make_step(.Check, data, build.allocator)
 }
 
 CheckStepOpts :: struct {
@@ -38,7 +45,7 @@ CheckStepOpts :: struct {
 @(require_results)
 add_build_step :: proc(build: ^Build) -> (^BuildConfig, Step) {
     data := new_clone(default_build_config, build.allocator)
-    step := make_step("build", data, build.allocator)
+    step := make_step(.Build, data, build.allocator)
     return data, step
 }
 
@@ -46,57 +53,62 @@ add_build_step :: proc(build: ^Build) -> (^BuildConfig, Step) {
 // TODO: revision https://github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/main.cpp#L506
 //odinfmt: disable
 BuildConfig :: struct {
-    src_path:               string,
-    out_filepath:           string,
+    src_path:                string,
+    out_filepath:            string,
     // location for any build artifacts to be placed.
-    install_dir:            string,
-    optimization:           OptimizationMode,
+    install_dir:             string,
+    optimization:            OptimizationMode,
     // exports
-    timings_export:         TimingsExport,
-    dependencies_export:    DependenciesExport,
-    definables_export_file: string,
+    timings_export:          TimingsExport,
+    dependencies_export:     DependenciesExport,
+    definables_export_file:  string,
 
-    build_mode:             BuildMode,
-    target:                 CompilationTarget,
+    build_mode:              BuildMode,
+    target:                  CompilationTarget,
     // only used when target is Darwin
-    subtarget:              CompilationSubTarget,
-    minimum_os_version:     string,
+    subtarget:               CompilationSubTarget,
+    minimum_os_version:      string,
 
-    extra_linker_flags:     string,
-    extra_assembler_flags:  string,
-    microarch:              string,
+    extra_linker_flags:      string,
+    extra_assembler_flags:   string,
+    microarch:               string,
     // comma-separated list of strings
-    // https://github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/build_settings_microarch.cpp#L20
-    target_features:        string,
-    reloc_mode:             RelocMode,
-    sanitization:           Sanitization,
+    // https:                //github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/build_settings_microarch.cpp#L20
+    target_features:         string,
+    reloc_mode:              RelocMode,
+    sanitization:            Sanitization,
 
-    thread_count:           uint,
-    error_pos_style:        ErrorStyle,
-    max_error_count:        uint,
+    thread_count:            uint,
+    error_pos_style:         ErrorStyle,
+    max_error_count:         uint,
 
-    flags:                  Flags,
-    vet_flags:              VetFlags,
+    flags:                   BuildFlags,
+    vet_flags:               VetFlags,
     // comma-separated list of package-names
-    vet_packages:           string,
-    defines:                [dynamic]Define,
-    custom_attributes:      [dynamic]string,
+    vet_packages:            string,
+    defines:                 [dynamic]Define,
+    custom_attributes:       [dynamic]string,
 
-    print_odin_invocation:  bool,
+    print_odin_invocation:   bool,
+
+    // automatically detected from the src_path
+    _self_contained_package: bool,
+    _dependencies:           map[string]Dependency,
+    _collections:            [dynamic]Collection,
 }
 //odinfmt: enable
 
 // TODO: should we make this user visible?
 default_build_config := BuildConfig {
-    src_path    = "src",
-    install_dir = "out",
+    src_path     = "src",
+    install_dir  = "out",
 }
 
 @(require_results)
 add_run_step :: proc(build: ^Build, opts: RunStepOpts) -> Step {
     data := new(RunStep, build.allocator)
     data.opts = opts
-    return make_step("run", data, build.allocator)
+    return make_step(.Run, data, build.allocator)
 }
 
 RunStepOpts :: struct {
@@ -111,7 +123,7 @@ RunStep :: struct {
 add_system_command_invocation :: proc(build: ^Build, argv: []string) -> Step {
     data := new(SystemCommandStep, build.allocator)
     data.argv = argv
-    return make_step("system-command", data, build.allocator)
+    return make_step(.SystemCommand, data, build.allocator)
 }
 
 SystemCommandStep :: struct {
