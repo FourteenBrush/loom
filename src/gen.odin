@@ -19,31 +19,31 @@ ExecutionType :: enum {
 
 @(private)
 resolve_compile_step :: proc(config: ^BuildConfig, type: ExecutionType, allocator: mem.Allocator) {
-	//context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
-	//defer log.destroy_console_logger(context.logger)
+    //context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
+    //defer log.destroy_console_logger(context.logger)
 
-	if err := verify_build(config); err != "" {
-		fatal(err)
-	}
+    if err := verify_build(config); err != "" {
+        fatal(err)
+    }
 
-	// FIXME: apply to build immediately before verification
-	if config.install_dir == "" {
-		config.install_dir = DEFAULT_INSTALL_DIR
-	}
+    // FIXME: apply to build immediately before verification
+    if config.install_dir == "" {
+        config.install_dir = DEFAULT_INSTALL_DIR
+    }
 
-	if err := install_missing_dependencies(config^); err != "" {
-		fatal(err)
-	}
+    if err := install_missing_dependencies(config^); err != "" {
+        fatal(err)
+    }
 
-	commandline := build_invocation(config^, allocator)
-	if config.print_odin_invocation {
+    commandline := build_invocation(config^, allocator)
+    if config.print_odin_invocation {
         info(commandline)
-	}
+    }
 
-	if exitcode := libc.system(commandline); exitcode != 0 {
-		// odin will have printed to stderr
+    if exitcode := libc.system(commandline); exitcode != 0 {
+        // odin will have printed to stderr
         os.exit(1)
-	}
+    }
 }
 
 // odinfmt: disable
@@ -95,38 +95,38 @@ verify_build :: proc(
 
 @(private)
 verify_src_path :: proc(
-	src: string,
-	allocator := context.allocator,
+    src: string,
+    allocator := context.allocator,
 ) -> (
-	self_contained, ok: bool,
+    self_contained, ok: bool,
 ) {
-	stat, errno := os.stat(src, allocator)
-	if errno != nil {
-		// fallback to make caller able to provide a more accurate error message
-		self_contained = filepath.ext(src) == ".odin"
-		return
-	}
+    stat, errno := os.stat(src, allocator)
+    if errno != nil {
+        // fallback to make caller able to provide a more accurate error message
+        self_contained = filepath.ext(src) == ".odin"
+        return
+    }
 
-	os.file_info_delete(stat, allocator)
-	return !stat.is_dir, true
+    os.file_info_delete(stat, allocator)
+    return !stat.is_dir, true
 }
 
 // TODO: os and build mode specific out filename extensions
 @(private)
 build_invocation :: proc(config: BuildConfig, allocator := context.allocator) -> cstring {
-	sb := strings.builder_make(0, 512, allocator)
-	fmt.sbprint(&sb, "odin build ")
+    sb := strings.builder_make(0, 512, allocator)
+    fmt.sbprint(&sb, "odin build ")
 
-	fmt.sbprintf(&sb, "%s ", config.src_path)
-	if config._self_contained_package {
-		fmt.sbprint(&sb, "-file ")
-	}
+    fmt.sbprintf(&sb, "%s ", config.src_path)
+    if config._self_contained_package {
+        fmt.sbprint(&sb, "-file ")
+    }
 
-	// if not set assumes current directory
-	if config.out_filepath != "" {
-		fmt.sbprintf(&sb, "-out:%s ", config.out_filepath)
-	}
-	
+    // if not set assumes current directory
+    if config.out_filepath != "" {
+        fmt.sbprintf(&sb, "-out:%s ", config.out_filepath)
+    }
+    
     // odinfmt: disable
     switch config.optimization {
     case .None:       fmt.sbprint(&sb, "-o:none ")
@@ -161,10 +161,10 @@ build_invocation :: proc(config: BuildConfig, allocator := context.allocator) ->
     }
     // odinfmt: enable
 
-	if config.definables_export_file != "" {
-		fmt.sbprintf(&sb, "-export-defineables:%s ", config.definables_export_file)
-	}
-	
+    if config.definables_export_file != "" {
+        fmt.sbprintf(&sb, "-export-defineables:%s ", config.definables_export_file)
+    }
+    
     // odinfmt: disable
     switch config.build_mode {
     case .Exe:       // default
@@ -176,29 +176,29 @@ build_invocation :: proc(config: BuildConfig, allocator := context.allocator) ->
     }
     // odinfmt: enable
 
-	if config.target != .Host {
-		fmt.sbprintf(&sb, "-target:%s ", target_to_str[config.target])
-	}
-	if config.subtarget != .None {
-		fmt.sbprintf(&sb, "-subtarget:%s ", config.subtarget)
-	}
+    if config.target != .Host {
+        fmt.sbprintf(&sb, "-target:%s ", target_to_str[config.target])
+    }
+    if config.subtarget != .None {
+        fmt.sbprintf(&sb, "-subtarget:%s ", config.subtarget)
+    }
 
-	if config.minimum_os_version != "" {
-		fmt.sbprintf(&sb, "-minimal-os-version:%s ", config.minimum_os_version)
-	}
+    if config.minimum_os_version != "" {
+        fmt.sbprintf(&sb, "-minimal-os-version:%s ", config.minimum_os_version)
+    }
 
-	if config.extra_linker_flags != "" {
-		fmt.sbprintf(&sb, "-extra-linker-flags:%s ", config.extra_linker_flags)
-	}
+    if config.extra_linker_flags != "" {
+        fmt.sbprintf(&sb, "-extra-linker-flags:%s ", config.extra_linker_flags)
+    }
 
-	if config.microarch != "" {
-		fmt.sbprintf(&sb, "-microarch:%s ", config.microarch)
-	}
+    if config.microarch != "" {
+        fmt.sbprintf(&sb, "-microarch:%s ", config.microarch)
+    }
 
-	if config.target_features != "" {
-		fmt.sbprintf(&sb, "-target-features:%s ", config.target_features)
-	}
-	
+    if config.target_features != "" {
+        fmt.sbprintf(&sb, "-target-features:%s ", config.target_features)
+    }
+    
     // odinfmt: disable
     switch config.reloc_mode {
     case .Default:
@@ -216,40 +216,40 @@ build_invocation :: proc(config: BuildConfig, allocator := context.allocator) ->
     }
     // odinfmt: enable
 
-	if config.thread_count > 0 {
-		fmt.sbprintf(&sb, "-thread-count:%d ", config.thread_count)
-	}
+    if config.thread_count > 0 {
+        fmt.sbprintf(&sb, "-thread-count:%d ", config.thread_count)
+    }
 
-	if config.error_pos_style == .Unix {
-		fmt.sbprint(&sb, "-error-style:unix ")
-	}
+    if config.error_pos_style == .Unix {
+        fmt.sbprint(&sb, "-error-style:unix ")
+    }
 
-	if config.max_error_count > 0 {
-		fmt.sbprintf(&sb, "-max-error-count:%d ", config.max_error_count)
-	}
+    if config.max_error_count > 0 {
+        fmt.sbprintf(&sb, "-max-error-count:%d ", config.max_error_count)
+    }
 
-	for flag in config.flags {
-		fmt.sbprintf(&sb, "%s ", flag_to_str[flag])
-	}
+    for flag in config.flags {
+        fmt.sbprintf(&sb, "%s ", flag_to_str[flag])
+    }
 
-	for flag in config.vet_flags {
-		fmt.sbprint(&sb, vet_flag_to_str[flag], ' ')
-	}
+    for flag in config.vet_flags {
+        fmt.sbprint(&sb, vet_flag_to_str[flag], ' ')
+    }
 
     if config.vet_packages != "" {
         fmt.sbprint(&sb, "-vet-packages:%s ", config.vet_packages)
     }
 
-	for define in config.defines {
-		fmt.sbprintf(&sb, "-define:%s=%v ", define.name, define.value)
-	}
+    for define in config.defines {
+        fmt.sbprintf(&sb, "-define:%s=%v ", define.name, define.value)
+    }
 
-	for attrib in config.custom_attributes {
-		fmt.sbprintf(&sb, "-custom-attribute:%s ", attrib)
-	}
+    for attrib in config.custom_attributes {
+        fmt.sbprintf(&sb, "-custom-attribute:%s ", attrib)
+    }
 
-	strings.pop_byte(&sb)
-	return strings.to_cstring(&sb)
+    strings.pop_byte(&sb)
+    return strings.to_cstring(&sb)
 }
 
 // TODO: logger cannot be initialized because build system does not act as the entrypoint
