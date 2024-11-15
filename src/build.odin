@@ -1,12 +1,50 @@
 package loom
 
+import "core:fmt"
 import "core:mem"
 
 define_build :: proc(backing_alloc := context.allocator) -> (b: Build) {
     b.allocator = backing_alloc
-    b.root_step.name = "root"
+    b.root_step.id = .Root
     b.root_step.dependencies = make([dynamic]Step, backing_alloc)
     return
+}
+
+build :: proc(build: Build) {
+    if len(build.root_step.dependencies) == 0 {
+        warn("build root step does not have any dependencies, no work is performed")
+        return
+    }
+
+    traversed := make([dynamic]^Step, build.allocator)
+    stack := make([dynamic]^Step, build.allocator)
+    _root := build.root_step
+    append(&stack, &_root)
+
+    for step in pop_safe(&stack) {
+        append(&traversed, step)
+
+        for &dependency in step.dependencies {
+            append(&stack, &dependency)
+        }
+    }
+
+    #reverse for step in traversed {
+        fmt.println("Running step", step.id)
+        resolve_step(step^, build)
+    }
+
+    info("build finished")
+}
+
+@(private)
+resolve_step :: proc(step: Step, build: Build) {
+    #partial switch step.id {
+    case .Root: // empty
+    case .Build:
+        config := data_cast(step.data, BuildConfig)
+        resolve_compile_step(config, .Build, build.allocator)
+    }
 }
 
 Build :: struct {
@@ -26,7 +64,7 @@ BuildMode :: enum {
 // https://github.com/odin-lang/Odin/blob/cb31df34c199638a03193520e03a59fc722429d2/src/build_settings.cpp#L721
 // odinfmt: disable
 CompilationTarget :: enum {
-    Host,
+    Host = 0,
     DarwinAmd64,
     DarwinArm64,
 
@@ -75,7 +113,7 @@ CompilationSubTarget :: enum {
 
 @(private, rodata)
 target_to_str := [CompilationTarget]string {
-    .Host                   = "",
+    .Host                   = "<invalid>",
     .DarwinAmd64            = "darwin_amd64",
     .DarwinArm64            = "darwin_arm64",
     .EssenceAmd64           = "essence_amd64",
@@ -122,10 +160,12 @@ ErrorStyle :: enum {
 
 // FIXME: microarch enum? seems to be specific per target
 
-Flags :: bit_set[Flag]
+// TODO: some flags can be global for the build, instead of for each compiler invocation
+// assumming multiple compiler invocations may happen?
+BuildFlags :: bit_set[BuildFlag]
 
 // SelfContainedPackage (-file) will be implicitly detected from the src_path.
-Flag :: enum {
+BuildFlag :: enum {
     ShowSystemCalls,
     KeepTempFiles,
     ShowDefineables,
@@ -157,7 +197,7 @@ Flag :: enum {
 }
 
 @(private, rodata)
-flag_to_str := [Flag]string {
+flag_to_str := [BuildFlag]string {
     .ShowSystemCalls              = "-show-system-calls",
     .KeepTempFiles                = "-keep-temp-files",
     .ShowDefineables              = "-show-defineables",

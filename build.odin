@@ -1,6 +1,5 @@
 package build
 
-import "core:fmt"
 import "core:mem"
 import "dependencies/loom"
 
@@ -11,6 +10,8 @@ main :: proc() {
     context.allocator = mem.panic_allocator()
 	
 	build_config, build_step := loom.add_build_step(&build)
+    build_config.src_path = "dependencies/reader/src"
+    build_config.out_filepath = "out/reader"
     build_config.print_odin_invocation = true
     build_config.flags += {.ShowSystemCalls}
 

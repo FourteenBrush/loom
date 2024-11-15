@@ -27,6 +27,12 @@ make_step :: proc(id: StepId, data: ^$D, allocator: mem.Allocator) -> Step {
     }
 }
 
+@(private)
+data_cast :: proc(data: any, $D: typeid) -> ^D {
+    assert(data.id == D, "step datatype does not correspond to target type, this is a bug")
+    return (^D)(data.data)
+}
+
 step_depends_on :: proc(step: ^Step, dependency: Step) {
     assert(step != nil)
     append(&step.dependencies, dependency)

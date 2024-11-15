@@ -29,3 +29,8 @@ Loom will consist of two parts, that when combined are able to build a project:
 - Bootstrap phase (API dependency needed), build file compilation and initialization
 - Configuration phase, build() gets called
 - Execution phase, actual compilation
+
+## Thoughts
+
+What happens with transitive dependencies?
+Is it possible to have incompatible dependencies?

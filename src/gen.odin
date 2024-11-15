@@ -19,9 +19,6 @@ ExecutionType :: enum {
 
 @(private)
 resolve_compile_step :: proc(config: ^BuildConfig, type: ExecutionType, allocator: mem.Allocator) {
-    //context.logger = log.create_console_logger(.Debug when ODIN_DEBUG else .Warning)
-    //defer log.destroy_console_logger(context.logger)
-
     if err := verify_build(config); err != "" {
         fatal(err)
     }
