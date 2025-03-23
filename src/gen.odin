@@ -52,7 +52,7 @@ verify_build :: proc(
     self_contained, ok := verify_src_path(config.src_path, allocator)
     if !ok {
         format := "Source file %s does not exist" if self_contained else "Source files %s do not exist"
-        return fmt.tprintln(format, config.src_path)
+        return fmt.tprintfln(format, config.src_path)
     }
     config._self_contained_package = self_contained
 
